@@ -2,12 +2,32 @@
 # Name: secure.sh
 # Author: Mark Spicer
 # Purpose: To secure a machine during a security competition.
+# Downloaded from https://github.com/lodge93/blueteam/blob/master/defense/secure.sh
+# Modified by Ladislav Baco
+
 
 # Verify this script is being run by the root user.
 if [ $EUID -ne 0 ]; then
    echo "This script must be run as root" 1>&2
    exit 1
 fi
+
+# Prepare clear binaries
+./bin/busybox --install -s bin/
+export PATH="$(./bin/pwd)/bin"
+mkdir log
+
+# Clear aliases, use busybox
+alias > ./log/alias.log
+cat ./log/alias.log
+
+# Whoami info
+who > ./log/whoami.log
+hostname >> ./log/whoami.log
+uname -a >> ./log/whoami.log
+ifconfig >> ./log/whoami.log
+cat ./log/whoami.log
+
 
 # Determine the OS and version on which the script is being run.
 OS=$(lsb_release -si | awk '{print tolower($0)}')
@@ -28,19 +48,6 @@ if [ $OS == 'ubuntu' ]; then
 	echo "deb-src http://mirrors.us.kernel.org/ubuntu/ $VERSION main" >> /etc/apt/sources.list
 	echo "deb http://mirrors.us.kernel.org/ubuntu/ $VERSION-security main" >> /etc/apt/sources.list
     
-    # Update apt-get with the new sources.
-    apt-get update
-
-	# Reinstall passwd command and change root password.
-	apt-get --reinstall install -y passwd
-	passwd
-
-	# Reinstall crucial software.
-	apt-get --reinstall install -y bash
-	apt-get --reinstall install -y openssl
-	apt-get --reinstall install -y coreutils
-	apt-get --reinstall install -y vim
-	apt-get --reinstall install -y wget
 elif [ $OS == 'debian' ]; then
 	# Fix file repositories
 	mv /etc/apt/sources.list /etc/apt/sources.list.backup
@@ -53,21 +60,25 @@ elif [ $OS == 'debian' ]; then
    
     echo "deb http://http.debian.net/debian $VERSION-updates main" >> /etc/apt/sources.list
     echo "deb-src http://http.debian.net/debian $VERSION-updates main" >> /etc/apt/sources.list
-
-    # Update apt-get with the new sources.
-    apt-get update
-
-	# Reinstall passwd command and change root password.
-	apt-get --reinstall install -y passwd
-	passwd
-
-	# Reinstall crucial software.
-	apt-get --reinstall install -y bash
-	apt-get --reinstall install -y openssl
-	apt-get --reinstall install -y coreutils
-	apt-get --reinstall install -y vim
-	apt-get --reinstall install -y wget
 fi
+
+# Update apt-get with the new sources.
+apt-get update
+
+# Reinstall passwd command and change root password.
+apt-get --reinstall install -y passwd
+passwd
+
+# Reinstall crucial software.
+apt-get --reinstall install -y bash
+apt-get --reinstall install -y openssl
+apt-get --reinstall install -y coreutils
+apt-get --reinstall install -y vim
+apt-get --reinstall install -y wget
+apt-get --reinstall install -y tee
+apt-get --reinstall install -y screen
+apt-get --reinstall install -y tmux
+apt-get --reinstall install -y mc
 
 # Lock down the sudoers file.
 chattr -i /etc/sudoers
@@ -84,7 +95,7 @@ echo "" > /etc/anacrontab
 chattr +i /etc/anacrontab
 
 # Check programs that have root privliges
-find / -perm -04000 > programsWithRootAccess.txt
+find / -perm -04000 | tee ./log/suid.log
 
 # Remove existing ssh keys
 rm -rf ~/.ssh/*
@@ -126,6 +137,19 @@ do
     gpasswd -d $i root
 done
 
+# Check rootkits
+apt-get --reinstall install -y rkhunter
+apt-get --reinstall install -y chkrootkit
+apt-get --reinstall install -y debsums
+
+chkrootkit | tee ./log/chkrootkit.log
+rkhunter -c -l ./log/rkhunter.log --sk --rwo
+debsums -c -l | tee ./log/debsums.log
+netstat -elnop -A inet,inet6 | tee ./log/netstat.log
+
+
+echo "Hardening done, press enter for upgrade"
+read
 # Upgrade all packages.
 if [[ $OS == 'ubuntu' || $OS == 'debian' ]]; then
     apt-get update
@@ -134,3 +158,4 @@ fi
 
 # Reboot the system
 reboot
+
