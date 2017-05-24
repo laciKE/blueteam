@@ -159,13 +159,13 @@ echo "tmpfs     /tmp     tmpfs     defaults,noexec,nosuid     0     0" >> /etc/f
 
 
 # Check rootkits
-apt-get --reinstall install -y rkhunter
+#apt-get --reinstall install -y rkhunter
 apt-get --reinstall install -y chkrootkit
 apt-get --reinstall install -y debsums
 
 chkrootkit | tee ./log/chkrootkit.log
-rkhunter --update -q
-rkhunter -c -l ./log/rkhunter.log --sk --rwo
+#rkhunter --update -q
+#rkhunter -c -l ./log/rkhunter.log --sk --rwo
 debsums -c -l | tee ./log/debsums.log
 netstat -elnop -A inet,inet6 | tee ./log/netstat.log
 
