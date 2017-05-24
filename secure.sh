@@ -13,8 +13,9 @@ if [ $EUID -ne 0 ]; then
 fi
 
 # Prepare clear binaries
-./bin/busybox --install -s bin/
-export PATH="$(./bin/pwd)/bin"
+#./bin/busybox --install -s bin/
+#export PATH="$(./bin/pwd)/bin:/sbin:/usr/sbin:/bin:/usr/bin"
+export PATH="/sbin:/usr/sbin:/bin:/usr/bin"
 mkdir log
 
 # Clear aliases, use busybox
@@ -37,37 +38,46 @@ VERSION=$(lsb_release -sc | awk '{print tolower($0)}')
 echo $VERSION
 
 # Temporarily configure DNS servers. 
-echo 'nameserver 8.8.8.8' > /etc/resolv.conf
-echo 'nameserver 8.8.4.4' >> /etc/resolv.conf
+echo 'nameserver 10.0.3.9' > /etc/resolv.conf
+echo 'nameserver 10.0.1.5' >> /etc/resolv.conf
 
 # Fix package repositories for each os. 
-if [ $OS == 'ubuntu' ]; then
-	# Fix file repositories
-	mv /etc/apt/sources.list /etc/apt/sources.list.backup
-	echo "deb http://mirrors.us.kernel.org/ubuntu/ $VERSION main" > /etc/apt/sources.list
-	echo "deb-src http://mirrors.us.kernel.org/ubuntu/ $VERSION main" >> /etc/apt/sources.list
-	echo "deb http://mirrors.us.kernel.org/ubuntu/ $VERSION-security main" >> /etc/apt/sources.list
+#if [ $OS == 'ubuntu' ]; then
+#	# Fix file repositories
+#	mv /etc/apt/sources.list /etc/apt/sources.list.backup
+#	echo "deb http://mirrors.us.kernel.org/ubuntu/ $VERSION main" > /etc/apt/sources.list
+#	echo "deb-src http://mirrors.us.kernel.org/ubuntu/ $VERSION main" >> /etc/apt/sources.list
+#	echo "deb http://mirrors.us.kernel.org/ubuntu/ $VERSION-security main" >> /etc/apt/sources.list
     
-elif [ $OS == 'debian' ]; then
+#elif [ $OS == 'debian' ]; then
 	# Fix file repositories
-	mv /etc/apt/sources.list /etc/apt/sources.list.backup
+#	mv /etc/apt/sources.list /etc/apt/sources.list.backup
+#
+#	echo "deb http://http.debian.net/debian $VERSION main" > /etc/apt/sources.list
+#	echo "deb-src http://http.debian.net/debian $VERSION main" >> /etc/apt/sources.list
+#	
+#	echo "deb http://security.debian.org/ $VERSION/updates main" >> /etc/apt/sources.list
+#	echo "deb-src http://security.debian.org/ $VERSION/updates main" >> /etc/apt/sources.list
+#	
+#	echo "deb http://http.debian.net/debian $VERSION-updates main" >> /etc/apt/sources.list
+#	echo "deb-src http://http.debian.net/debian $VERSION-updates main" >> /etc/apt/sources.list
+#fi
 
-    echo "deb http://http.debian.net/debian $VERSION main" > /etc/apt/sources.list
-    echo "deb-src http://http.debian.net/debian $VERSION main" >> /etc/apt/sources.list
-   
-    echo "deb http://security.debian.org/ $VERSION/updates main" >> /etc/apt/sources.list
-    echo "deb-src http://security.debian.org/ $VERSION/updates main" >> /etc/apt/sources.list
-   
-    echo "deb http://http.debian.net/debian $VERSION-updates main" >> /etc/apt/sources.list
-    echo "deb-src http://http.debian.net/debian $VERSION-updates main" >> /etc/apt/sources.list
-fi
+#remove busybox from PATH
+# TODO remove busybox after apt-get, but apt-get uses tar with option unsupported by busybox
+export PATH="/bin:/sbin:/usr/sbin:/bin:/usr/bin"
 
 # Update apt-get with the new sources.
+apt-get update
+apt-get --reinstall install -y apt
 apt-get update
 
 # Reinstall passwd command and change root password.
 apt-get --reinstall install -y passwd
+echo "Change root password"
 passwd
+echo "Change admin password"
+passwd admin
 
 # Reinstall crucial software.
 apt-get --reinstall install -y bash
@@ -75,16 +85,15 @@ apt-get --reinstall install -y openssl
 apt-get --reinstall install -y coreutils
 apt-get --reinstall install -y vim
 apt-get --reinstall install -y wget
-apt-get --reinstall install -y tee
 apt-get --reinstall install -y screen
 apt-get --reinstall install -y tmux
 apt-get --reinstall install -y mc
 
 # Lock down the sudoers file.
-chattr -i /etc/sudoers
-echo "root    ALL=(ALL:ALL) ALL" > /etc/sudoers
-chmod 000 /etc/sudoers
-chattr +i /etc/sudoers
+#chattr -i /etc/sudoers
+#echo "root    ALL=(ALL:ALL) ALL" > /etc/sudoers
+#chmod 000 /etc/sudoers
+#chattr +i /etc/sudoers
 
 # Clear cronjobs.
 chattr -i /etc/crontab
@@ -93,6 +102,8 @@ chattr +i /etc/crontab
 chattr -i /etc/anacrontab
 echo "" > /etc/anacrontab
 chattr +i /etc/anacrontab
+mkdir ./backup
+mv /etc/cron.* ./backup
 
 # Check programs that have root privliges
 find / -perm -04000 | tee ./log/suid.log
@@ -137,12 +148,23 @@ do
     gpasswd -d $i root
 done
 
+# restrict su command only for user admin
+groupadd suadmin
+usermod -a -G suadmin admin
+dpkg-statoverride --update --add root suadmin 4750 /bin/su
+
+# Hardening shared memory and /tmp
+echo "tmpfs     /run/shm     tmpfs     defaults,noexec,nosuid     0     0" >> /etc/fstab
+echo "tmpfs     /tmp     tmpfs     defaults,noexec,nosuid     0     0" >> /etc/fstab
+
+
 # Check rootkits
 apt-get --reinstall install -y rkhunter
 apt-get --reinstall install -y chkrootkit
 apt-get --reinstall install -y debsums
 
 chkrootkit | tee ./log/chkrootkit.log
+rkhunter --update -q
 rkhunter -c -l ./log/rkhunter.log --sk --rwo
 debsums -c -l | tee ./log/debsums.log
 netstat -elnop -A inet,inet6 | tee ./log/netstat.log
@@ -158,4 +180,3 @@ fi
 
 # Reboot the system
 reboot
-
