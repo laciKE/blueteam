@@ -14,7 +14,7 @@ fi
 
 # Prepare clear binaries
 #./bin/busybox --install -s bin/
-#export PATH="$(./bin/pwd)/bin:/sbin:/usr/sbin:/bin:/usr/bin"
+export PATH="$(./bin/pwd)/bin:/sbin:/usr/sbin:/bin:/usr/bin"
 export PATH="/sbin:/usr/sbin:/bin:/usr/bin"
 mkdir log
 
@@ -38,30 +38,30 @@ VERSION=$(lsb_release -sc | awk '{print tolower($0)}')
 echo $VERSION
 
 # Temporarily configure DNS servers. 
-echo 'nameserver 10.0.3.9' > /etc/resolv.conf
-echo 'nameserver 10.0.1.5' >> /etc/resolv.conf
+echo 'nameserver 8.8.8.8' > /etc/resolv.conf
+echo 'nameserver 8.8.4.4' >> /etc/resolv.conf
 
 # Fix package repositories for each os. 
-#if [ $OS == 'ubuntu' ]; then
-#	# Fix file repositories
-#	mv /etc/apt/sources.list /etc/apt/sources.list.backup
-#	echo "deb http://mirrors.us.kernel.org/ubuntu/ $VERSION main" > /etc/apt/sources.list
-#	echo "deb-src http://mirrors.us.kernel.org/ubuntu/ $VERSION main" >> /etc/apt/sources.list
-#	echo "deb http://mirrors.us.kernel.org/ubuntu/ $VERSION-security main" >> /etc/apt/sources.list
-    
-#elif [ $OS == 'debian' ]; then
+if [ $OS == 'ubuntu' ]; then
 	# Fix file repositories
-#	mv /etc/apt/sources.list /etc/apt/sources.list.backup
-#
-#	echo "deb http://http.debian.net/debian $VERSION main" > /etc/apt/sources.list
-#	echo "deb-src http://http.debian.net/debian $VERSION main" >> /etc/apt/sources.list
-#	
-#	echo "deb http://security.debian.org/ $VERSION/updates main" >> /etc/apt/sources.list
-#	echo "deb-src http://security.debian.org/ $VERSION/updates main" >> /etc/apt/sources.list
-#	
-#	echo "deb http://http.debian.net/debian $VERSION-updates main" >> /etc/apt/sources.list
-#	echo "deb-src http://http.debian.net/debian $VERSION-updates main" >> /etc/apt/sources.list
-#fi
+	mv /etc/apt/sources.list /etc/apt/sources.list.backup
+	echo "deb http://mirrors.us.kernel.org/ubuntu/ $VERSION main" > /etc/apt/sources.list
+	echo "deb-src http://mirrors.us.kernel.org/ubuntu/ $VERSION main" >> /etc/apt/sources.list
+	echo "deb http://mirrors.us.kernel.org/ubuntu/ $VERSION-security main" >> /etc/apt/sources.list
+    
+elif [ $OS == 'debian' ]; then
+	# Fix file repositories
+	mv /etc/apt/sources.list /etc/apt/sources.list.backup
+
+	echo "deb http://http.debian.net/debian $VERSION main" > /etc/apt/sources.list
+	echo "deb-src http://http.debian.net/debian $VERSION main" >> /etc/apt/sources.list
+	
+	echo "deb http://security.debian.org/ $VERSION/updates main" >> /etc/apt/sources.list
+	echo "deb-src http://security.debian.org/ $VERSION/updates main" >> /etc/apt/sources.list
+	
+	echo "deb http://http.debian.net/debian $VERSION-updates main" >> /etc/apt/sources.list
+	echo "deb-src http://http.debian.net/debian $VERSION-updates main" >> /etc/apt/sources.list
+fi
 
 #remove busybox from PATH
 # TODO remove busybox after apt-get, but apt-get uses tar with option unsupported by busybox
@@ -90,10 +90,10 @@ apt-get --reinstall install -y tmux
 apt-get --reinstall install -y mc
 
 # Lock down the sudoers file.
-#chattr -i /etc/sudoers
-#echo "root    ALL=(ALL:ALL) ALL" > /etc/sudoers
-#chmod 000 /etc/sudoers
-#chattr +i /etc/sudoers
+chattr -i /etc/sudoers
+echo "root    ALL=(ALL:ALL) ALL" > /etc/sudoers
+chmod 000 /etc/sudoers
+chattr +i /etc/sudoers
 
 # Clear cronjobs.
 chattr -i /etc/crontab
@@ -159,13 +159,13 @@ echo "tmpfs     /tmp     tmpfs     defaults,noexec,nosuid     0     0" >> /etc/f
 
 
 # Check rootkits
-#apt-get --reinstall install -y rkhunter
+apt-get --reinstall install -y rkhunter
 apt-get --reinstall install -y chkrootkit
 apt-get --reinstall install -y debsums
 
 chkrootkit | tee ./log/chkrootkit.log
-#rkhunter --update -q
-#rkhunter -c -l ./log/rkhunter.log --sk --rwo
+rkhunter --update -q
+rkhunter -c -l ./log/rkhunter.log --sk --rwo
 debsums -c -l | tee ./log/debsums.log
 netstat -elnop -A inet,inet6 | tee ./log/netstat.log
 
